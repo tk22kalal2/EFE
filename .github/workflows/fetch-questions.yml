@@ -1,78 +1,43 @@
-name: Fetch Quiz Questions
+const axios = require('axios');
+const fs = require('fs');
 
-on:
-  workflow_dispatch:
+const openAiKey = process.env.OPENAI_API_KEY;
 
-jobs:
-  generateQuestions:
-    runs-on: ubuntu-latest
-
-    steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v3  # Updated to v3
-
-    - name: Install Node.js
-      uses: actions/setup-node@v3  # Updated to v3
-      with:
-        node-version: '16'
-
-    - name: Install Dependencies
-      run: npm install axios
-
-    - name: Fetch Questions from OpenAI
-      run: |
-        node -e "
-        const axios = require('axios');
-        const fs = require('fs');
-        const openAiKey = process.env.OPENAI_API_KEY;
-
-        async function fetchQuestions() {
-            try {
-                const response = await axios.post(
-                    'https://api.openai.com/v1/completions',
-                    {
-                        model: 'text-davinci-003',
-                        prompt: 'Generate a multiple-choice question on basic general knowledge with four answer options.',
-                        max_tokens: 100,
-                        n: 5,
-                        stop: null,
-                        temperature: 0.7
-                    },
-                    {
-                        headers: {
-                            'Authorization': `Bearer ${openAiKey}`
-                        }
-                    }
-                );
-
-                const questions = response.data.choices.map((choice) => {
-                    return {
-                        question: choice.text.trim(),
-                        answers: [
-                            { text: "Option 1", correct: true },
-                            { text: "Option 2", correct: false },
-                            { text: "Option 3", correct: false },
-                            { text: "Option 4", correct: false }
-                        ]
-                    };
-                });
-
-                fs.writeFileSync('questions.json', JSON.stringify(questions, null, 2));
-            } catch (error) {
-                console.error('Error fetching questions:', error);
-                process.exit(1);
+async function fetchQuestions() {
+    try {
+        const response = await axios.post(
+            'https://api.openai.com/v1/completions',
+            {
+                model: 'text-davinci-003',
+                prompt: 'Generate a multiple-choice question on basic general knowledge with four answer options.',
+                max_tokens: 100,
+                n: 5,
+                stop: null,
+                temperature: 0.7
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${openAiKey}`
+                }
             }
-        }
+        );
 
-        fetchQuestions();
-        "
+        const questions = response.data.choices.map((choice, index) => ({
+            question: choice.text.trim(),
+            answers: [
+                { text: `Option ${index + 1}A`, correct: true },
+                { text: `Option ${index + 1}B`, correct: false },
+                { text: `Option ${index + 1}C`, correct: false },
+                { text: `Option ${index + 1}D`, correct: false }
+            ]
+        }));
 
-    - name: Commit and Push Questions
-      run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
-        git add questions.json
-        git commit -m "Update quiz questions"
-        git push
-      env:
-        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        fs.writeFileSync('questions.json', JSON.stringify(questions, null, 2));
+        console.log("Questions fetched and saved successfully.");
+    } catch (error) {
+        console.error('Error fetching questions:', error);
+        process.exit(1);
+    }
+}
+
+fetchQuestions();
